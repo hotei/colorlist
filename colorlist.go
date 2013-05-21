@@ -218,7 +218,9 @@ func ColorVal(s string) color.RGBA {
 	}
 }
 
-func MapLen() (int,int) {
+// the map lengths need not be same, for example; if Lightblue and Paleblue map to same value
+//  just a convenience function, useful if you're loading colormaps from files.
+func mapLen() (names int, values int) {
 	return len(ColorNameMap),len(ColorValMap)	
 }
 

@@ -6,6 +6,7 @@
 
 
 // simplest way to use test is "go test"
+
 package 
 
 colorlist
