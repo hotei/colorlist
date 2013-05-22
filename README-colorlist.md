@@ -11,12 +11,18 @@ re-issued as a new repository : github.com/hotei/colorlist.
 The main difference between the packages is that Brendans provides pre-named
 variables representing colors.  For example colors.Black is an RGBA value in
 his package. I chose to go the route of color lookup tables.  The same value in
-my package would be colorlist.ColorVal("black").
+my package would be colorlist.ColorVal("black").  You can also specify color values
+with rgb hex codes.  Evaluating colorlist.ColorVal("#f5F5f5") returns the same
+result as colorlist.ColorVal("WhiteSmoke")  This can be useful if you're using
+a color picker from PhotoShop or Gimp to grab specific colors.
 
 There are advantages and disadvantages to both approaches.  In his system a bad 
-color name results in a compile time error.  In mine it results in a default 
-color (black) being substituted but the program continues to run.  An advantage
-of my system is that configuration files can easily map colors from strings to
+color name results in a compile time error - which is not always a bad thing.  
+In mine it results in a default color (black) being substituted but the program 
+continues to run - though of course it might not produce the expected colors (unless
+you spelled it "blackk" :-) .
+
+With my system configuration files can easily map colors from strings to
 RGBA values.  You can also add your own colors to the maps on the fly and even
 change the existing color values if you wish.
 
@@ -30,6 +36,8 @@ The second set of  colors are specified by the [CSS3 standard][3]
 
 [Color-book.org][2] is a web site with many colors displayed and listed in
 both rgb and cmyk forms.
+
+There's a test file with examples to show usage.
 
 ### Take a Quick Look at the Exported Interface
 

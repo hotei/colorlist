@@ -192,15 +192,15 @@ func init() {
 
 }
 
-func AddColor(name string, r,g,b,a int) {
-	colorval := color.RGBA{uint8(r),uint8(g),uint8(b),uint8(a)}
+func AddColor(name string, r, g, b, a int) {
+	colorval := color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
 	ColorNameMap[name] = colorval
 	ColorValMap[colorval] = strings.ToLower(name)
-//	fmt.Printf("colorlist.AddColor() added %s\n",name)
+	//	fmt.Printf("colorlist.AddColor() added %s\n",name)
 }
 
 // returns empty string if no match, see also NearestColorName()
-//	 all names are lowercase on return regardless of case when added 
+//	 all names are lowercase on return regardless of case when added
 func ColorName(c color.RGBA) string {
 	if name, ok := ColorValMap[c]; ok {
 		return name
@@ -211,17 +211,25 @@ func ColorName(c color.RGBA) string {
 
 // returns black {0,0,0,255} if no match
 func ColorVal(s string) color.RGBA {
+	rv := color.RGBA{0, 0, 0, 255} // Black is default
+	if len(s) <= 1 {
+		return rv
+	}
+	if s[0] == '#' {
+		// TODO(mdr): should we memoize it or not?
+		return HexToColorRGBA(s)
+	}
 	if rgba, ok := ColorNameMap[strings.ToLower(s)]; ok {
 		return rgba
 	} else {
-		return color.RGBA{0, 0, 0, 255} // Black
+		return rv
 	}
 }
 
 // the map lengths need not be same, for example; if Lightblue and Paleblue map to same value
 //  just a convenience function, useful if you're loading colormaps from files.
 func mapLen() (names int, values int) {
-	return len(ColorNameMap),len(ColorValMap)	
+	return len(ColorNameMap), len(ColorValMap)
 }
 
 // naive compare
@@ -229,7 +237,7 @@ func mapLen() (names int, values int) {
 func colorDiff(a, b color.RGBA) int64 {
 	var sumsq int64
 	// note - extra promotions to wider signed int are required? convert inner pairs to int64
-	sumsq =  int64(int32(a.R)-int32(b.R)) * int64(int32(a.R)-int32(b.R)) // diff in red component sq'd
+	sumsq = int64(int32(a.R)-int32(b.R)) * int64(int32(a.R)-int32(b.R))  // diff in red component sq'd
 	sumsq += int64(int32(a.G)-int32(b.G)) * int64(int32(a.G)-int32(b.G)) // diff in green component sq'd
 	sumsq += int64(int32(a.B)-int32(b.B)) * int64(int32(a.B)-int32(b.B)) // diff in blue component sq'd
 	return sumsq
@@ -256,4 +264,73 @@ func ColorNameNearest(c color.RGBA) string {
 		}
 	}
 	return bestName
+}
+
+// returns value of hex char
+func validHexChar(c byte) int {
+	var rv = -1
+	var hexchars []byte = []byte("0123456789abcdefABCDEF")
+	for ndx, h := range hexchars {
+		if c == h {
+			rv = int(ndx)
+			break
+		}
+	}
+	if rv < 0 {
+		return -1
+	}
+	if rv > 15 {
+		rv -= 6
+	}
+	return rv
+}
+
+func validHexString(s string) bool {
+	for _, c := range s {
+		if validHexChar(byte(c)) < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// convert #ccc -> {12,12,12,255}
+func hex3ToColorRGBA(s string) color.RGBA {
+	r := validHexChar(s[0])
+	g := validHexChar(s[1])
+	b := validHexChar(s[2])
+	return color.RGBA{uint8(r), uint8(g), uint8(b), 255}
+}
+
+// convert #0c0c0c -> {12,12,12,255}
+func hex6ToColorRGBA(s string) color.RGBA {
+	r := validHexChar(s[0])*16 + validHexChar(s[1])
+	g := validHexChar(s[2])*16 + validHexChar(s[3])
+	b := validHexChar(s[4])*16 + validHexChar(s[5])
+	return color.RGBA{uint8(r), uint8(g), uint8(b), 255}
+}
+
+// convert #ccc or #0c0c0c -> {12,12,12,255}
+//   must be either 3 or 6 hex chars, preceeded by number symbol
+//   returns black if bad format encountered
+func HexToColorRGBA(s string) color.RGBA {
+	//fmt.Printf("Converting hexToColorRGBA(%s)\n",s)
+	rv := color.RGBA{0, 0, 0, 255}
+	if len(s) <= 1 {
+		return rv
+	}
+	if s[0] != '#' {
+		return rv
+	}
+	s = strings.ToLower(s)
+	if !validHexString(s[1:]) {
+		return rv
+	}
+	if len(s) == 4 {
+		return hex3ToColorRGBA(s[1:])
+	}
+	if len(s) == 7 {
+		return hex6ToColorRGBA(s[1:])
+	}
+	return rv
 }
