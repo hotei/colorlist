@@ -39,6 +39,8 @@ both rgb and cmyk forms.
 
 There's a test file with examples to show usage.
 
+License is BSD-style.
+
 ### Take a Quick Look at the Exported Interface
 
 Inspect the [GoDocs][5] at godoc.org
