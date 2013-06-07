@@ -35,7 +35,7 @@ The first set (16) colors is specified by the [HTML 4 standard][1]
 The second set of  colors are specified by the [CSS3 standard][3]
 
 [Color-book.org][2] is a web site with many colors displayed and listed in
-both rgb and cmyk forms.
+both rgb and cmyk forms.  You can easily add any of these with AddColor().
 
 There's a test file with examples to show usage.
 

@@ -209,6 +209,13 @@ func ColorName(c color.RGBA) string {
 	}
 }
 
+// returns hex triplet as #abcdef string
+func SVGColorStr(s string) string {
+	c := ColorVal(s)
+	rv := fmt.Sprintf("#%02x%02x%02x",c.R,c.G,c.B)
+	return rv
+}
+
 // returns black {0,0,0,255} if no match
 func ColorVal(s string) color.RGBA {
 	rv := color.RGBA{0, 0, 0, 255} // Black is default
@@ -334,3 +341,4 @@ func HexToColorRGBA(s string) color.RGBA {
 	}
 	return rv
 }
+
