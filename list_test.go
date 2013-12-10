@@ -14,9 +14,10 @@ import (
 	"testing"
 )
 
+var black = color.RGBA{0, 0, 0, 255}
+
 func Test_0002(t *testing.T) {
 	grey := color.RGBA{12, 12, 12, 255}
-	black := color.RGBA{0, 0, 0, 255}
 	for _, d := range []struct {
 		string
 		color.RGBA
@@ -71,15 +72,16 @@ func Test_0001(t *testing.T) {
 	for _, d := range []struct {
 		color.RGBA
 		name string
-	} {
-		{color.RGBA{255,102,204,255}, "radish"},
+		dup  bool
+	}{
+		{color.RGBA{255, 102, 204, 255}, "radish", false},
+		{color.RGBA{205, 175, 149, 255}, "PeachPuff3", false},
 	} {
 		if g, e := ColorVal(d.name), black; g != e {
 			t.Errorf("ColorVal(%q) returned %v, expected %v", d.name, g, e)
 		} else {
-			t.Logf("ColorVal(%q) returned %v, as expected", d.name, g)
+			//t.Logf("ColorVal(%q) returned %v, as expected", d.name, g)
 		}
-		//AddColor("radish", 255, 102, 204, 255)
 		r, g, b, a := d.RGBA.RGBA()
 		AddColor(d.name, int(r), int(g), int(b), int(a))
 		if g, e := ColorVal(d.name), d.RGBA; g != e {
@@ -96,7 +98,7 @@ func Test_0001(t *testing.T) {
 		{whitesmoke, "whitesmoke", "whitesmoke", "#f5f5f5"},
 		{color.RGBA{0, 0, 0, 255}, "black", "black", "#000000"},
 		{color.RGBA{0, 0, 255, 255}, "blue", "blue", "#0000ff"},
-		{color.RGBA{255,102,204,255}, "radish", "radish", "#ff66cc"},
+		{color.RGBA{255, 102, 204, 255}, "radish", "radish", "#ff66cc"},
 	} {
 		nm := strings.Title(d.name)
 		if g, e := ColorVal(nm), d.RGBA; g != e {
@@ -114,5 +116,102 @@ func Test_0001(t *testing.T) {
 		} else {
 			//t.Logf("ColorVal(%q) returned %v, as expected", d.svg, g)
 		}
+	}
+}
+
+func TestBidirection(t *testing.T) {
+	aliases := map[string]string{
+		"cyan":           "aqua",
+		"darkgrey":       "darkgray",
+		"darkslategrey":  "darkslategray",
+		"dimgrey":        "dimgray",
+		"grey":           "gray",
+		"lightgrey":      "lightgray",
+		"lightslategrey": "lightslategray",
+		"magenta":        "fuchsia",
+		"paleyellow":     "lightyellow",
+		"slategrey":      "slategray",
+	}
+	for name := range colorNameMap {
+		if g := ColorName(ColorVal(name)); g != name {
+			if aliases[g] == name {
+				//t.Logf("Got alias %q for %q", g, name)
+				continue
+			}
+			//fmt.Printf("\t\t%q: %q,\n", g, name)
+			t.Errorf("ColorName(ColorVal(%q)) returned %q, expected %q",
+				name, g, name)
+		}
+	}
+	for c := range colorValMap {
+		if g := ColorVal(ColorName(c)); g != c {
+			t.Errorf("ColorVal(ColorName(%v)) returned %v, expected %v",
+				c, g, c)
+		}
+	}
+
+	for _, d := range []struct {
+		color.RGBA
+		name string
+	}{
+		{color.RGBA{225, 21, 61, 254}, "Crimson"},
+		{color.RGBA{220, 20, 60, 255}, "Crimson2"},
+	} {
+		origRGBA := ColorVal(d.name)
+		//origName := ColorName(d.RGBA)
+		r, g, b, a := d.RGBA.RGBA()
+		AddColor(d.name, int(r), int(g), int(b), int(a))
+		for _, c := range []color.RGBA{d.RGBA, origRGBA} {
+			if g := ColorVal(ColorName(c)); g != c {
+				t.Errorf("After AddColor(%q): ColorVal(ColorName(%v)) returned %v, expected %v",
+					d.name, c, g, c)
+			}
+		}
+	}
+}
+
+func BenchmarkColorVal(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ColorVal("LightGoldenRodYellow")
+	}
+}
+
+func BenchmarkSVGColor(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		SVGColorStr("LightGoldenRodYellow")
+	}
+}
+
+func BenchmarkNearMatch(b *testing.B) {
+	c := ColorVal("LightGoldenRodYellow")
+	for i := 0; i < b.N; i++ {
+		ColorNameNearest(c)
+	}
+}
+
+func BenchmarkNearNoMatch(b *testing.B) {
+	c := ColorVal("LightGoldenRodYellow")
+	c.R++
+	c.A--
+	for i := 0; i < b.N; i++ {
+		ColorNameNearest(c)
+	}
+}
+
+func BenchmarkHexToColorRGB_3(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		HexToColorRGBA("#abc")
+	}
+}
+
+func BenchmarkHexToColorRGB_6(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		HexToColorRGBA("#5a5b5c")
+	}
+}
+
+func BenchmarkHexToColorRGB_20(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		HexToColorRGBA("#ffffffffffffffffffff")
 	}
 }
