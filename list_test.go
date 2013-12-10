@@ -57,28 +57,28 @@ func Test_0001(t *testing.T) {
 	if ColorVal("WhiteSmoke") != ws {    // note CamelCase isn't how it was added
 		t.Errorf("ColorVal(string) failed got %v, not {244,244,240,255} \n", ColorVal("WhiteSmoke"))
 	}
-	
-	AddColor("radish", 255,102,204,255)
-	
+
+	AddColor("radish", 255, 102, 204, 255)
+
 	//ws = ColorVal("#ccc")
 	newSmoke := ColorVal("#f5f5F5")
 	fmt.Printf("Testing newSmoke = #f5f5F5\n")
 	if newSmoke != ws {
 		t.Errorf("ColorVal(#string) failed got %v, not {244,244,240,255} \n", newSmoke)
 	}
-	
+
 	svgSmoke := SVGColorStr("whitesmoke")
-	fmt.Printf("svg name of whitesmoke should be #f5f5f5, got %s\n",svgSmoke)
+	fmt.Printf("svg name of whitesmoke should be #f5f5f5, got %s\n", svgSmoke)
 	if svgSmoke != "#f5f5f5" {
 		t.Errorf("svg name of whitesmoke should be #f5f5f5, not %s\n", svgSmoke)
 	}
 	svgSmoke = SVGColorStr("black")
-	fmt.Printf("svg name of black should be #000000, got %s\n",svgSmoke)
+	fmt.Printf("svg name of black should be #000000, got %s\n", svgSmoke)
 	if svgSmoke != "#000000" {
 		t.Errorf("svg name of black should be #000000, not %s\n", svgSmoke)
 	}
 	svgSmoke = SVGColorStr("radish")
-	fmt.Printf("svg name of radish should be #ff66cc, got %s\n",svgSmoke)
+	fmt.Printf("svg name of radish should be #ff66cc, got %s\n", svgSmoke)
 	if svgSmoke != "#ff66cc" {
 		t.Errorf("svg name of radish should be #ff66cc, not %s\n", svgSmoke)
 	}
