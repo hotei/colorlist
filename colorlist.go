@@ -199,7 +199,7 @@ func AddColor(name string, r, g, b, a int) {
 	//	fmt.Printf("colorlist.AddColor() added %s\n",name)
 }
 
-// returns empty string if no match, see also NearestColorName()
+// returns empty string if no match, see also ColorNameNearest()
 //	 all names are lowercase on return regardless of case when added
 func ColorName(c color.RGBA) string {
 	if name, ok := ColorValMap[c]; ok {
@@ -265,7 +265,8 @@ func ColorNameNearest(c color.RGBA) string {
 		if false {
 			fmt.Printf("%s diff value is %d\n", cName, diff)
 		}
-		if diff < bestDiff { // and save if its better than current best
+		// and save if its better than current best
+		if diff < bestDiff || (diff == bestDiff && cName < bestName){
 			bestDiff = diff
 			bestName = cName
 		}
