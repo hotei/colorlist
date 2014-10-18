@@ -4,29 +4,34 @@
 // reserved. Use of this file is governed by a BSD-style license that can be
 // found in the LICENSE_MDR.md file.
 
+// Package colorlist implements a color name to/from RGBA value mapping.
+//
 // Features:
 //	map from color name string to RGBA value
 //	map from RGBA value to color name - or nearest color name
 //	colornames can be added by user to supplement or override basic names
+//	safe for concurrent use
 package colorlist
 
 import (
-	// below are go 1.1 standard lib packages only
+	"encoding/hex"
 	"fmt"
 	"image/color"
 	"strings"
+	"sync"
 )
 
-type ColorPair struct {
+type colorPair struct {
 	RGBAval color.RGBA
 	Name    string
 }
 
-var ColorNameMap map[string]color.RGBA
-var ColorValMap map[color.RGBA]string
+var mapM sync.Mutex // Is this overkill?
+var colorNameMap map[string]color.RGBA
+var colorValMap map[color.RGBA]string
 
 func init() {
-	var ColorNamesAry = []ColorPair{
+	var colorNames = []colorPair{
 		// first 16 are the HTML4.01 color list aka sRGB (en.wikipedia.org/wiki/Web_colors
 		{color.RGBA{0, 255, 255, 255}, "Aqua"},
 		{color.RGBA{0, 0, 255, 255}, "Blue"},
@@ -181,164 +186,208 @@ func init() {
 		{color.RGBA{255, 255, 224, 255}, "Paleyellow"}, // alias of Lightyellow
 	}
 
-	ColorNameMap = make(map[string]color.RGBA)
-	ColorValMap = make(map[color.RGBA]string)
+	// no mutex required during init()
+	colorNameMap = make(map[string]color.RGBA, len(colorNames))
+	colorValMap = make(map[color.RGBA]string, len(colorNames))
 
-	for _, c := range ColorNamesAry {
+	for _, c := range colorNames {
 		name := strings.ToLower(c.Name)
-		ColorNameMap[name] = c.RGBAval
-		ColorValMap[c.RGBAval] = name
+		colorNameMap[name] = c.RGBAval
+		colorValMap[c.RGBAval] = name
 	}
 
 }
 
+// NotFoundError values describe a failure to lookup a color name.
+type NotFoundError string
+
+func (e NotFoundError) Error() string {
+	return fmt.Sprintf("colorlist: color %q not found", string(e))
+}
+
+// AddColor adds a new color to the map.
+// Just a convience wrapper to AddColorRGBA().
 func AddColor(name string, r, g, b, a int) {
-	colorval := color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
-	ColorNameMap[name] = colorval
-	ColorValMap[colorval] = strings.ToLower(name)
+	AddColorRGBA(name, color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)})
+}
+
+// AddColorRGBA adds a new color to the map.
+//
+// BUG(x): if the name matches an existing color then
+// for the old color value x: ColorVal(ColorName(x)) != x
+func AddColorRGBA(name string, colorval color.RGBA) {
+	name = strings.ToLower(name)
+	mapM.Lock()
+	colorNameMap[name] = colorval
+	colorValMap[colorval] = name
+	mapM.Unlock()
 	//	fmt.Printf("colorlist.AddColor() added %s\n",name)
 }
 
-// returns empty string if no match, see also NearestColorName()
-//	 all names are lowercase on return regardless of case when added
+// ColorName returns the name of the color or the empty string if there
+// is no match.
+// All names are returned lowercase regardless of case when added.
+//
+// See Also: ColorNameNearest()
 func ColorName(c color.RGBA) string {
-	if name, ok := ColorValMap[c]; ok {
-		return name
-	} else {
-		return ""
-	}
+	mapM.Lock()
+	defer mapM.Unlock()
+	return colorValMap[c]
 }
 
-// returns hex triplet as #abcdef string
+// SVGColorStr returns the hex triplet color value for the given color name.
+//
+// E.g. "#12a0f0".
 func SVGColorStr(s string) string {
 	c := ColorVal(s)
-	rv := fmt.Sprintf("#%02x%02x%02x",c.R,c.G,c.B)
-	return rv
+	var b [7]byte
+	b[0] = '#'
+	hex.Encode(b[1:], []byte{byte(c.R), byte(c.G), byte(c.B)})
+	return string(b[:])
 }
 
-// returns black {0,0,0,255} if no match
+// ColorVal returns the RGBA color of the named color
+// or black {0, 0, 0, 255} if no match is found.
+//
+// Also accepts three or six character hex values prefixed with '#'
+// (e.g. #ccc or #0c0c0c).
 func ColorVal(s string) color.RGBA {
-	rv := color.RGBA{0, 0, 0, 255} // Black is default
-	if len(s) <= 1 {
-		return rv
+	rgba, err := Color(s)
+	if err != nil {
+		return color.RGBA{0, 0, 0, 255}
 	}
-	if s[0] == '#' {
-		// TODO(mdr): should we memoize it or not?
-		return HexToColorRGBA(s)
+	return rgba
+}
+
+// Color returns the RGBA color of the named color, if found.
+// If not found either an error from HexToColor() or NotFoundError is returned.
+//
+// Also accepts three or six character hex values prefixed with '#'
+// (e.g. #ccc or #0c0c0c).
+func Color(s string) (rgba color.RGBA, err error) {
+	if len(s) >= 1 && s[0] == '#' {
+		return HexToColor(s)
 	}
-	if rgba, ok := ColorNameMap[strings.ToLower(s)]; ok {
-		return rgba
-	} else {
-		return rv
+	mapM.Lock()
+	defer mapM.Unlock()
+	if rgba, ok := colorNameMap[strings.ToLower(s)]; ok {
+		return rgba, nil
 	}
+	return rgba, NotFoundError(s)
 }
 
 // the map lengths need not be same, for example; if Lightblue and Paleblue map to same value
 //  just a convenience function, useful if you're loading colormaps from files.
+// XXX loading/saving should probably be handled by this package if required.
 func mapLen() (names int, values int) {
-	return len(ColorNameMap), len(ColorValMap)
+	mapM.Lock()
+	defer mapM.Unlock()
+	return len(colorNameMap), len(colorValMap)
 }
 
-// naive compare
-//  is there a better method?
-func colorDiff(a, b color.RGBA) int64 {
-	var sumsq int64
-	// note - extra promotions to wider signed int are required? convert inner pairs to int64
-	sumsq = int64(int32(a.R)-int32(b.R)) * int64(int32(a.R)-int32(b.R))  // diff in red component sq'd
-	sumsq += int64(int32(a.G)-int32(b.G)) * int64(int32(a.G)-int32(b.G)) // diff in green component sq'd
-	sumsq += int64(int32(a.B)-int32(b.B)) * int64(int32(a.B)-int32(b.B)) // diff in blue component sq'd
+// colorDiff returns the sum of the RGB differences squared.
+// TODO(x): naive color comparison, is there a better method?
+func colorDiff(a, b color.RGBA) (sumsq uint64) {
+	// note - extra promotions to wider signed int are required? convert inner pairs to uint64
+	sumsq = uint64(int32(a.R)-int32(b.R)) * uint64(int32(a.R)-int32(b.R))
+	sumsq += uint64(int32(a.G)-int32(b.G)) * uint64(int32(a.G)-int32(b.G))
+	sumsq += uint64(int32(a.B)-int32(b.B)) * uint64(int32(a.B)-int32(b.B))
 	return sumsq
 }
 
-// always returns a name even if wildly off
+// ColorNameNearest is like ColorName but returns the closest match,
+// even if wildly off.
 func ColorNameNearest(c color.RGBA) string {
 	// assume black is closest to start with {0,0,0,-}  any starting color would work
-	bestDiff := colorDiff(ColorVal("black"), c)
+	bestDiff := colorDiff(color.RGBA{0, 0, 0, 255}, c)
 	bestName := "black"
 
-	for rgba, cName := range ColorValMap {
-		if c == rgba {
-			return cName
-		}
+	mapM.Lock()
+	defer mapM.Unlock()
+	if cName, ok := colorValMap[c]; ok {
+		return cName
+	}
+	for rgba, cName := range colorValMap {
 		// not equal so see how good the match is
 		diff := colorDiff(c, rgba)
-		if false {
-			fmt.Printf("%s diff value is %d\n", cName, diff)
-		}
-		if diff < bestDiff { // and save if its better than current best
+		//fmt.Printf("%s diff value is %d\n", cName, diff)
+		// and save if its better than current best
+		if diff < bestDiff || (diff == bestDiff && cName < bestName) {
 			bestDiff = diff
 			bestName = cName
+			if diff <= 0 {
+				return bestName
+			}
 		}
 	}
 	return bestName
 }
 
-// returns value of hex char
-func validHexChar(c byte) int {
-	var rv = -1
-	var hexchars []byte = []byte("0123456789abcdefABCDEF")
-	for ndx, h := range hexchars {
-		if c == h {
-			rv = int(ndx)
-			break
-		}
+// fromHexChar converts a hex character into its value and a success flag.
+// From encoding/hex/hex.go
+func fromHexChar(c byte) (byte, bool) {
+	switch {
+	case '0' <= c && c <= '9':
+		return c - '0', true
+	case 'a' <= c && c <= 'f':
+		return c - 'a' + 10, true
+	case 'A' <= c && c <= 'F':
+		return c - 'A' + 10, true
 	}
-	if rv < 0 {
-		return -1
-	}
-	if rv > 15 {
-		rv -= 6
-	}
-	return rv
+
+	return 0, false
 }
 
-func validHexString(s string) bool {
-	for _, c := range s {
-		if validHexChar(byte(c)) < 0 {
-			return false
-		}
-	}
-	return true
-}
-
-// convert #ccc -> {12,12,12,255}
-func hex3ToColorRGBA(s string) color.RGBA {
-	r := validHexChar(s[0])
-	g := validHexChar(s[1])
-	b := validHexChar(s[2])
-	return color.RGBA{uint8(r), uint8(g), uint8(b), 255}
-}
-
-// convert #0c0c0c -> {12,12,12,255}
-func hex6ToColorRGBA(s string) color.RGBA {
-	r := validHexChar(s[0])*16 + validHexChar(s[1])
-	g := validHexChar(s[2])*16 + validHexChar(s[3])
-	b := validHexChar(s[4])*16 + validHexChar(s[5])
-	return color.RGBA{uint8(r), uint8(g), uint8(b), 255}
-}
-
-// convert #ccc or #0c0c0c -> {12,12,12,255}
-//   must be either 3 or 6 hex chars, preceeded by number symbol
-//   returns black if bad format encountered
+// HexToColorRGBA converts hex colors to RGBA colors.
+// Input must be either 3 or 6 hex chars, preceeded by '#'.
+// Returns black if bad format encountered.
+//
+// E.g. convert #ccc or #0c0c0c -> {12,12,12,255}
 func HexToColorRGBA(s string) color.RGBA {
+	if c, err := HexToColor(s); err != nil {
+		return color.RGBA{0, 0, 0, 255}
+	} else {
+		return c
+	}
+}
+
+// HexToColor converts hex colors to RGBA colors.
+// Input must be either 3 or 6 hex chars, preceeded by '#'.
+//
+// On failure, returns hex.ErrLength or hex.InvalidByteError (from encoding/hex).
+//
+// E.g. convert #ccc or #0c0c0c -> {12,12,12,255}
+func HexToColor(s string) (c color.RGBA, err error) {
 	//fmt.Printf("Converting hexToColorRGBA(%s)\n",s)
-	rv := color.RGBA{0, 0, 0, 255}
-	if len(s) <= 1 {
-		return rv
+	if len(s) != 4 && len(s) != 7 {
+		return c, hex.ErrLength
 	}
 	if s[0] != '#' {
-		return rv
+		return c, hex.InvalidByteError(s[0])
 	}
-	s = strings.ToLower(s)
-	if !validHexString(s[1:]) {
-		return rv
+	s = s[1:]
+	var result [3]uint8
+	switch len(s) {
+	case 3:
+		for i := 0; i < 3; i++ {
+			a, ok := fromHexChar(s[i])
+			if !ok {
+				return c, hex.InvalidByteError(s[i])
+			}
+			result[i] = a
+		}
+	case 6:
+		for i := 0; i < 3; i++ {
+			a, ok := fromHexChar(s[i*2])
+			if !ok {
+				return c, hex.InvalidByteError(s[i*2])
+			}
+			b, ok := fromHexChar(s[i*2+1])
+			if !ok {
+				return c, hex.InvalidByteError(s[i*2+1])
+			}
+			result[i] = (a << 4) | b
+		}
 	}
-	if len(s) == 4 {
-		return hex3ToColorRGBA(s[1:])
-	}
-	if len(s) == 7 {
-		return hex6ToColorRGBA(s[1:])
-	}
-	return rv
+	return color.RGBA{result[0], result[1], result[2], 255}, nil
 }
-
