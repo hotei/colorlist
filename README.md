@@ -1,6 +1,5 @@
-<center>
-# colorlist
-</center>
+colorlist
+=========
 
 [This go package] [4] started as a fork of github.com/btracey/colorlist.  Since then
 it has diverged enough that retaining it as a fork is probably not useful.  Brendan
