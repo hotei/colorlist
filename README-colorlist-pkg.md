@@ -2,10 +2,10 @@
 # colorlist
 </center>
 
-[This go package] [4] started as a fork of github.com/btracey/colorlist.  Since then
+[The colorlist package] [4] started as a fork of github.com/btracey/colorlist.  Since then
 it has diverged enough that retaining it as a fork is probably not useful.  Brendan
 decided to change his repository name to colors so I've un-hitched this from
-his original repository which is now marked 'deprecated'.  This is now being
+his original repository which he has now marked 'deprecated'.  This is now being
 re-issued as a new repository : github.com/hotei/colorlist.
 
 The main difference between the packages is that Brendans provides pre-named
