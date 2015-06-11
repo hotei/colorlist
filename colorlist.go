@@ -210,26 +210,26 @@ func ColorName(c color.RGBA) string {
 }
 
 // returns hex triplet as #abcdef string
-func SVGColorStr(s string) string {
-	c := ColorVal(s)
+func SVGColorStr(s string) (string,error) {
+	c,err := ColorVal(s)
 	rv := fmt.Sprintf("#%02x%02x%02x", c.R, c.G, c.B)
-	return rv
+	return rv,err
 }
 
 // returns black {0,0,0,255} if no match
-func ColorVal(s string) color.RGBA {
+func ColorVal(s string) (color.RGBA,error) {
 	rv := color.RGBA{0, 0, 0, 255} // Black is default
 	if len(s) <= 1 {
-		return rv
+		return rv,fmt.Errorf("no value match for empty string")
 	}
 	if s[0] == '#' {
 		// TODO(mdr): should we memoize it or not?
-		return HexToColorRGBA(s)
+		return HexToColorRGBA(s),nil
 	}
 	if rgba, ok := ColorNameMap[strings.ToLower(s)]; ok {
-		return rgba
+		return rgba,nil
 	} else {
-		return rv
+		return rv, fmt.Errorf("no value match for color string:%s",s)
 	}
 }
 
@@ -253,7 +253,9 @@ func colorDiff(a, b color.RGBA) int64 {
 // always returns a name even if wildly off
 func ColorNameNearest(c color.RGBA) string {
 	// assume black is closest to start with {0,0,0,-}  any starting color would work
-	bestDiff := colorDiff(ColorVal("black"), c)
+	colorval, _ := ColorVal("black") // ignore error on purpose
+	
+	bestDiff := colorDiff(colorval, c)
 	bestName := "black"
 
 	for rgba, cName := range ColorValMap {
